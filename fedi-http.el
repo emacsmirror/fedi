@@ -300,7 +300,8 @@ Callback to `fedi-http--get-response-async'."
   ;; view raw response:
   ;; (switch-to-buffer (current-buffer))
   (let ((headers (unless no-headers
-                   (fedi-http--process-headers))))
+                   (fedi-http--process-headers)))
+        (status url-http-response-status))
     (goto-char (point-min))
     (re-search-forward "^$" nil 'move)
     (let ((json-array-type (if vector 'vector 'list))
@@ -308,7 +309,8 @@ Callback to `fedi-http--get-response-async'."
                         (buffer-substring-no-properties (point) (point-max))
                         'utf-8)))
       (kill-buffer)
-      (cond ((or (string-empty-p json-string) (null json-string)
+      (cond ((or (eq status 204)
+                 (string-empty-p json-string) (null json-string)
                  (string= "\nnull\n" json-string))
              nil)
             ;; if we get html, just render it and error:
