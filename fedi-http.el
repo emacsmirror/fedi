@@ -39,6 +39,8 @@
 (require 'json)
 ;; (require 'request) ; for attachments upload
 (require 'url)
+(defvar url-http-response-status)
+(defvar url-http-end-of-headers)
 
 (autoload 'shr-render-buffer "shr")
 (autoload 'fedi-auth--access-token "fedi-auth")
@@ -298,7 +300,8 @@ Callback to `fedi-http--get-response-async'."
   ;; view raw response:
   ;; (switch-to-buffer (current-buffer))
   (let ((headers (unless no-headers
-                   (fedi-http--process-headers))))
+                   (fedi-http--process-headers)))
+        (status url-http-response-status))
     (goto-char (point-min))
     (re-search-forward "^$" nil 'move)
     (let ((json-array-type (if vector 'vector 'list))
@@ -306,7 +309,8 @@ Callback to `fedi-http--get-response-async'."
                         (buffer-substring-no-properties (point) (point-max))
                         'utf-8)))
       (kill-buffer)
-      (cond ((or (string-empty-p json-string) (null json-string)
+      (cond ((or (eq status 204)
+                 (string-empty-p json-string) (null json-string)
                  (string= "\nnull\n" json-string))
              nil)
             ;; if we get html, just render it and error:
@@ -329,12 +333,14 @@ Callback to `fedi-http--get-response-async'."
   (goto-char (point-min))
   (let* ((head-str (buffer-substring-no-properties
                     (point-min)
-                    (re-search-forward "^$" nil 'move)))
+                    (- url-http-end-of-headers 1)))
          (head-list (split-string head-str "\n")))
-    (mapcar (lambda (x)
-              (let ((list (split-string x ": ")))
-                (cons (car list) (cadr list))))
-            head-list)))
+    (cons
+     (cons 'status url-http-response-status)
+     (mapcar (lambda (x)
+               (let ((sep (string-search ": " x)))
+                 (cons (substring x 0 sep) (substring x (+ 2 sep)))))
+             (cdr head-list)))))
 
 
 ;;; ASYNCHRONOUS FUNCTIONS
